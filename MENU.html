@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>منيو المطعم - أشهى الأطباق المنزلية</title>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Lucide Icons as SVG components
+        const Plus = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+        );
+
+        const Edit2 = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+            </svg>
+        );
+
+        const Trash2 = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+        );
+
+        const X = ({ size = 24 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        );
+
+        const Settings = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M12 1v6m0 6v6m8.66-9l-5.2 3m-6.92 4-5.2 3M20.66 17l-5.2-3m-6.92-4-5.2-3"></path>
+            </svg>
+        );
+
+        const ChevronLeft = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+        );
+
+        const ChevronRight = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+        );
+
+        const MenuIcon = () => (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        );
+
+        // Storage Implementation
+        const storage = {
+            get: (key) => {
+                const data = localStorage.getItem(key);
+                return data ? { value: data } : null;
+            },
+            set: (key, value) => {
+                localStorage.setItem(key, value);
+                return { key, value };
+            }
+        };
+
+        function MenuManager() {
+            const [items, setItems] = useState([]);
+            const [isAdding, setIsAdding] = useState(false);
+            const [editingItem, setEditingItem] = useState(null);
+            const [viewMode, setViewMode] = useState('display');
+            const [selectedCategory, setSelectedCategory] = useState('أطباق رئيسية');
+            const [sidebarOpen, setSidebarOpen] = useState(false);
+            
+            const [formData, setFormData] = useState({
+                name: '',
+                description: '',
+                category: 'أطباق رئيسية',
+                images: [],
+                variants: [{ size: '', price: '', pieces: '' }]
+            });
+
+            const categories = ['أطباق رئيسية', 'مقبلات', 'حلويات', 'سلطات', 'أخرى'];
+
+            useEffect(() => {
+                loadData();
+            }, []);
+
+            const loadData = () => {
+                try {
+                    const result = storage.get('menu-items');
+                    if (result && result.value) {
+                        setItems(JSON.parse(result.value));
+                    }
+                } catch (error) {
+                    console.log('تحميل البيانات للمرة الأولى');
+                }
+            };
+
+            const saveData = (newItems) => {
+                try {
+                    storage.set('menu-items', JSON.stringify(newItems));
+                } catch (error) {
+                    console.error('خطأ في حفظ البيانات:', error);
+                }
+            };
+
+            const handleImageUpload = (e) => {
+                const files = Array.from(e.target.files);
+                files.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        setFormData(prev => ({
+                            ...prev,
+                            images: [...prev.images, reader.result]
+                        }));
+                    };
+                    reader.readAsDataURL(file);
+                });
+            };
+
+            const removeImage = (index) => {
+                setFormData(prev => ({
+                    ...prev,
+                    images: prev.images.filter((_, i) => i !== index)
+                }));
+            };
+
+            const addVariant = () => {
+                setFormData(prev => ({
+                    ...prev,
+                    variants: [...prev.variants, { size: '', price: '', pieces: '' }]
+                }));
+            };
+
+            const removeVariant = (index) => {
+                if (formData.variants.length > 1) {
+                    setFormData(prev => ({
+                        ...prev,
+                        variants: prev.variants.filter((_, i) => i !== index)
+                    }));
+                }
+            };
+
+            const updateVariant = (index, field, value) => {
+                setFormData(prev => ({
+                    ...prev,
+                    variants: prev.variants.map((v, i) => 
+                        i === index ? { ...v, [field]: value } : v
+                    )
+                }));
+            };
+
+            const handleSubmit = () => {
+                if (!formData.name || !formData.variants[0].price) {
+                    alert('الرجاء إدخال اسم الصنف والسعر على الأقل');
+                    return;
+                }
+
+                const newItem = {
+                    ...formData,
+                    id: editingItem ? editingItem.id : Date.now()
+                };
+                
+                let newItems;
+                if (editingItem) {
+                    newItems = items.map(item => item.id === editingItem.id ? newItem : item);
+                } else {
+                    newItems = [...items, newItem];
+                }
+                
+                setItems(newItems);
+                saveData(newItems);
+                resetForm();
+            };
+
+            const resetForm = () => {
+                setFormData({
+                    name: '',
+                    description: '',
+                    category: 'أطباق رئيسية',
+                    images: [],
+                    variants: [{ size: '', price: '', pieces: '' }]
+                });
+                setIsAdding(false);
+                setEditingItem(null);
+            };
+
+            const startEdit = (item) => {
+                setEditingItem(item);
+                setFormData(item);
+                setIsAdding(true);
+            };
+
+            const deleteItem = (id) => {
+                if (confirm('هل أنت متأكد من حذف هذا الصنف؟')) {
+                    const newItems = items.filter(item => item.id !== id);
+                    setItems(newItems);
+                    saveData(newItems);
+                }
+            };
+
+            const categoryEmojis = {
+                'أطباق رئيسية': '🍖',
+                'مقبلات': '🥗',
+                'حلويات': '🍰',
+                'سلطات': '🥙',
+                'أخرى': '🍴'
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-red-50">
+                    <div className="bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-lg sticky top-0 z-40">
+                        <div className="max-w-7xl mx-auto px-4 py-4">
+                            <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        onClick={() => setSidebarOpen(!sidebarOpen)}
+                                        className="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition lg:hidden"
+                                    >
+                                        <MenuIcon />
+                                    </button>
+                                    <div>
+                                        <h1 className="text-2xl md:text-3xl font-bold">🍽️ منيو المطعم</h1>
+                                        <p className="text-orange-100 text-sm mt-1">أشهى الأطباق المنزلية</p>
+                                    </div>
+                                </div>
+                                {viewMode === 'manage' && (
+                                    <button
+                                        onClick={() => setIsAdding(true)}
+                                        className="px-4 py-2 bg-white text-orange-600 rounded-lg font-semibold hover:bg-orange-50 transition flex items-center gap-2"
+                                    >
+                                        <Plus />
+                                        <span className="hidden sm:inline">إضافة صنف</span>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex">
+                        <div className={`fixed lg:sticky top-0 right-0 h-screen bg-white shadow-2xl z-30 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'} w-64 flex flex-col`}>
+                            <div className="p-6 border-b border-gray-200 bg-gradient-to-br from-orange-50 to-red-50">
+                                <h2 className="text-xl font-bold text-gray-800">التصنيفات</h2>
+                            </div>
+                            
+                            <div className="p-4 space-y-2 flex-1 overflow-y-auto">
+                                {categories.map(category => {
+                                    const count = items.filter(item => item.category === category).length;
+                                    return (
+                                        <button
+                                            key={category}
+                                            onClick={() => {
+                                                setSelectedCategory(category);
+                                                setSidebarOpen(false);
+                                            }}
+                                            className={`w-full text-right px-4 py-3 rounded-lg font-semibold transition flex items-center justify-between ${
+                                                selectedCategory === category
+                                                    ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg'
+                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            }`}
+                                        >
+                                            <span className="flex items-center gap-3">
+                                                <span className="text-2xl">{categoryEmojis[category]}</span>
+                                                <span>{category}</span>
+                                            </span>
+                                            {count > 0 && (
+                                                <span className={`text-sm px-2 py-1 rounded-full ${
+                                                    selectedCategory === category ? 'bg-white text-orange-600' : 'bg-orange-100 text-orange-600'
+                                                }`}>
+                                                    {count}
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="p-4 border-t border-gray-200 bg-white">
+                                <button
+                                    onClick={() => setViewMode(viewMode === 'manage' ? 'display' : 'manage')}
+                                    className={`w-full px-4 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2 ${
+                                        viewMode === 'manage'
+                                            ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                    }`}
+                                >
+                                    <Settings />
+                                    {viewMode === 'manage' ? 'وضع العرض' : 'وضع الإدارة'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {sidebarOpen && (
+                            <div
+                                className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
+                                onClick={() => setSidebarOpen(false)}
+                            />
+                        )}
+
+                        <div className="flex-1 p-4 md:p-8">
+                            {isAdding && (
+                                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+                                    <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full my-8">
+                                        <div className="bg-gradient-to-r from-orange-600 to-red-600 text-white p-6 rounded-t-2xl flex justify-between items-center">
+                                            <h2 className="text-2xl font-bold">
+                                                {editingItem ? '✏️ تعديل الصنف' : '➕ إضافة صنف جديد'}
+                                            </h2>
+                                            <button onClick={resetForm} className="hover:bg-white hover:bg-opacity-20 p-2 rounded-lg transition">
+                                                <X />
+                                            </button>
+                                        </div>
+                                        
+                                        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <label className="block text-gray-700 font-semibold mb-2">اسم الصنف *</label>
+                                                    <input
+                                                        type="text"
+                                                        value={formData.name}
+                                                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                                                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none"
+                                                        placeholder="مثال: كباب مشوي"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-gray-700 font-semibold mb-2">الوصف</label>
+                                                    <textarea
+                                                        value={formData.description}
+                                                        onChange={(e) => setFormData({...formData, description: e.target.value})}
+                                                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none"
+                                                        rows="3"
+                                                        placeholder="وصف مختصر عن الصنف..."
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-gray-700 font-semibold mb-2">التصنيف *</label>
+                                                    <select
+                                                        value={formData.category}
+                                                        onChange={(e) => setFormData({...formData, category: e.target.value})}
+                                                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none"
+                                                    >
+                                                        {categories.map(cat => (
+                                                            <option key={cat} value={cat}>{cat}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-gray-700 font-semibold mb-2">
+                                                    📸 الصور (يمكنك إضافة عدة صور)
+                                                </label>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    multiple
+                                                    onChange={handleImageUpload}
+                                                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none"
+                                                />
+                                                {formData.images.length > 0 && (
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                                                        {formData.images.map((img, index) => (
+                                                            <div key={index} className="relative group">
+                                                                <img src={img} alt="" className="w-full h-32 object-cover rounded-lg" />
+                                                                <button
+                                                                    onClick={() => removeImage(index)}
+                                                                    className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"
+                                                                >
+                                                                    <X size={16} />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div>
+                                                <div className="flex justify-between items-center mb-3">
+                                                    <label className="text-gray-700 font-semibold">💰 الأحجام والأسعار</label>
+                                                    <button
+                                                        onClick={addVariant}
+                                                        className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition text-sm"
+                                                    >
+                                                        + إضافة حجم
+                                                    </button>
+                                                </div>
+                                                
+                                                <div className="space-y-3">
+                                                    {formData.variants.map((variant, index) => (
+                                                        <div key={index} className="bg-gray-50 p-4 rounded-lg border-2 border-gray-200">
+                                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                                <div>
+                                                                    <label className="block text-sm text-gray-600 mb-1">الحجم</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={variant.size}
+                                                                        onChange={(e) => updateVariant(index, 'size', e.target.value)}
+                                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none"
+                                                                        placeholder="صغير / وسط / كبير"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-sm text-gray-600 mb-1">السعر *</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={variant.price}
+                                                                        onChange={(e) => updateVariant(index, 'price', e.target.value)}
+                                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none"
+                                                                        placeholder="د.ع"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-sm text-gray-600 mb-1">عدد القطع</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={variant.pieces}
+                                                                        onChange={(e) => updateVariant(index, 'pieces', e.target.value)}
+                                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none"
+                                                                        placeholder="مثال: 4"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            {formData.variants.length > 1 && (
+                                                                <button
+                                                                    onClick={() => removeVariant(index)}
+                                                                    className="mt-2 text-red-500 text-sm hover:text-red-700"
+                                                                >
+                                                                    حذف هذا الحجم
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex gap-3 pt-4">
+                                                <button
+                                                    onClick={handleSubmit}
+                                                    className="flex-1 bg-gradient-to-r from-orange-600 to-red-600 text-white py-3 rounded-lg font-semibold hover:from-orange-700 hover:to-red-700 transition"
+                                                >
+                                                    {editingItem ? '💾 حفظ التعديلات' : '➕ إضافة الصنف'}
+                                                </button>
+                                                <button
+                                                    onClick={resetForm}
+                                                    className="px-8 bg-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-400 transition"
+                                                >
+                                                    إلغاء
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {viewMode === 'manage' ? (
+                                <ManageView 
+                                    items={items.filter(item => item.category === selectedCategory)} 
+                                    selectedCategory={selectedCategory}
+                                    startEdit={startEdit} 
+                                    deleteItem={deleteItem} 
+                                />
+                            ) : (
+                                <DisplayView 
+                                    items={items.filter(item => item.category === selectedCategory)}
+                                    selectedCategory={selectedCategory}
+                                />
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function ManageView({ items, selectedCategory, startEdit, deleteItem }) {
+            if (items.length === 0) {
+                return (
+                    <div className="text-center py-20">
+                        <div className="text-8xl mb-4">🍽️</div>
+                        <h3 className="text-2xl font-bold text-gray-700 mb-2">لا توجد أصناف في {selectedCategory}</h3>
+                        <p className="text-gray-500">اضغط "إضافة صنف" لإضافة أصناف جديدة</p>
+                    </div>
+                );
+            }
+
+            return (
+                <div>
+                    <h2 className="text-3xl font-bold text-gray-800 mb-6 pb-3 border-b-2 border-orange-500">
+                        {selectedCategory}
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {items.map(item => (
+                            <div key={item.id} className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition">
+                                {item.images.length > 0 && (
+                                    <img src={item.images[0]} alt={item.name} className="w-full h-48 object-cover" />
+                                )}
+                                <div className="p-5">
+                                    <h3 className="text-xl font-bold text-gray-800 mb-2">{item.name}</h3>
+                                    {item.description && (
+                                        <p className="text-gray-600 text-sm mb-3 line-clamp-2">{item.description}</p>
+                                    )}
+                                    <div className="space-y-2 mb-4">
+                                        {item.variants.map((variant, idx) => (
+                                            <div key={idx} className="flex justify-between items-center text-sm">
+                                                <span className="text-gray-700">
+                                                    {variant.size && `${variant.size} `}
+                                                    {variant.pieces && `(${variant.pieces} قطعة)`}
+                                                </span>
+                                                <span className="font-bold text-orange-600">{variant.price} د.ع</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => startEdit(item)}
+                                            className="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition flex items-center justify-center gap-2"
+                                        >
+                                            <Edit2 />
+                                            تعديل
+                                        </button>
+                                        <button
+                                            onClick={() => deleteItem(item.id)}
+                                            className="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition flex items-center justify-center gap-2"
+                                        >
+                                            <Trash2 />
+                                            حذف
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        function DisplayView({ items, selectedCategory }) {
+            const [currentImageIndex, setCurrentImageIndex] = useState({});
+
+            const nextImage = (itemId, maxIndex) => {
+                setCurrentImageIndex(prev => ({
+                    ...prev,
+                    [itemId]: ((prev[itemId] || 0) + 1) % maxIndex
+                }));
+            };
+
+            const prevImage = (itemId, maxIndex) => {
+                setCurrentImageIndex(prev => ({
+                    ...prev,
+                    [itemId]: ((prev[itemId] || 0) - 1 + maxIndex) % maxIndex
+                }));
+            };
+
+            if (items.length === 0) {
+                return (
+                    <div className="text-center py-20">
+                        <div className="text-8xl mb-4">📋</div>
+                        <h3 className="text-2xl font-bold text-gray-700 mb-2">لا توجد أصناف في {selectedCategory}</h3>
+                        <p className="text-gray-500">اختر تصنيف آخر من القائمة الجانبية</p>
+                    </div>
+                );
+            }
+
+            return (
+                <div>
+                    <div className="text-center mb-8">
+                        <h2 className="text-4xl font-bold text-gray-800 mb-2 inline-block pb-3 border-b-4 border-orange-500">
+                            {selectedCategory}
+                        </h2>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                        {items.map(item => {
+                            const currentIdx = currentImageIndex[item.id] || 0;
+                            return (
+                                <div key={item.id} className="bg-white rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition transform hover:-translate-y-1">
+                                    {item.images.length > 0 && (
+                                        <div className="relative">
+                                            <img 
+                                                src={item.images[currentIdx]} 
+                                                alt={item.name} 
+                                                className="w-full h-64 object-cover"
+                                            />
+                                            {item.images.length > 1 && (
+                                                <>
+                                                    <button
+                                                        onClick={() => prevImage(item.id, item.images.length)}
+                                                        className="absolute left-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 transition"
+                                                    >
+                                                        <ChevronLeft />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => nextImage(item.id, item.images.length)}
+                                                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 transition"
+                                                    >
+                                                        <ChevronRight />
+                                                    </button>
+                                                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+                                                        {item.images.map((_, idx) => (
+                                                            <div
+                                                                key={idx}
+                                                                className={`w-2 h-2 rounded-full ${idx === currentIdx ? 'bg-white' : 'bg-white bg-opacity-50'}`}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+                                    <div className="p-6">
+                                        <h3 className="text-2xl font-bold text-gray-800 mb-3">{item.name}</h3>
+                                        {item.description && (
+                                            <p className="text-gray-600 mb-4 leading-relaxed">{item.description}</p>
+                                        )}
+                                        <div className="space-y-3 bg-gradient-to-br from-orange-50 to-red-50 p-4 rounded-xl">
+                                            {item.variants.map((variant, idx) => (
+                                                <div key={idx} className="flex justify-between items-center">
+                                                    <span className="text-gray-700 font-medium">
+                                                        {variant.size && `${variant.size} `}
+                                                        {variant.pieces && (
+                                                            <span className="text-sm text-gray-500">({variant.pieces} قطعة)</span>
+                                                        )}
+                                                    </span>
+                                                    <span className="font-bold text-xl text-orange-600">{variant.price} د.ع</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        }
+
+        // Render the app
+        ReactDOM.render(<MenuManager />, document.getElementById('root'));
+    </script>
+</body>
+</html>
